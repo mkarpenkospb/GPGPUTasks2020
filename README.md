@@ -18,19 +18,15 @@ Windows
 2. Скачайте (требует регистрацию, [прямая ссылка для Windows](http://registrationcenter-download.intel.com/akdlm/irc_nas/vcp/13794/opencl_runtime_18.1_x64_setup.msi))
 3. Установите
 
-Linux (Рекомендуется Ubuntu 16.04)
+Linux (Рекомендуется Ubuntu 18.04)
 ----------------------------------
 
-1. Откройте https://software.intel.com/en-us/articles/opencl-drivers#cpu-lin-u
+1. Откройте https://software.intel.com/content/www/us/en/develop/tools/opencl-cpu-runtime.html
 2. Скачайте (требует регистрацию, [прямая ссылка для Ubuntu](http://registrationcenter-download.intel.com/akdlm/irc_nas/vcp/15532/l_opencl_p_18.1.0.015.tgz))
 3. ``apt-get install -yq cpio``
-4. ``tar -xzf opencl_runtime_16.1.2_x64_rh_6.4.0.37.tgz``
-5. ``sudo ./opencl_runtime_16.1.2_x64_rh_6.4.0.37/install.sh``
+4. ``tar -xzf l_opencl_p_18.1.0.015.tgz``
+5. ``sudo ./l_opencl_p_18.1.0.015/install.sh``
 6. Проведите установку.
-
-P.S. Если встретите эту ошибку, то я тоже ее наблюдал на Ubuntu 16.04, но в результате все работает:
-
-![OpenCL CPU runtime installation warning](/.figures/intel_cpu_ocl_driver_warning.png)
 
 Если в процессе запуска этого задания процессор не виден как допустимое OpenCL-устройство - создайте **Issue** в этом репозитории с перечислением:
 
@@ -60,12 +56,13 @@ AMD: [скачав](https://www.amd.com/en/support) и установив amdgpu
 
 1. Сделайте fork этого репозитория
 2. ``git clone ВАШ_ФОРК_РЕПОЗИТОРИЯ``
-3. ``cd Task0EnumDevices``
-4. ``mkdir build``
-5. ``cd build``
-6. ``cmake ..``
-7. ``make -j4``
-8. ``./enumDevices`` должно увидеть хотя бы одну OpenCL-платформу:
+3. ``cd GPGPUTasks2020``
+4. ``git checkout task00``
+5. ``mkdir build``
+6. ``cd build``
+7. ``cmake ..``
+8. ``make -j4``
+9. ``./enumDevices`` должно увидеть хотя бы одну OpenCL-платформу:
 
 ```
 Number of OpenCL platforms: 1
@@ -92,7 +89,7 @@ Aborted (Core dumped)
 =======
 
 0. Сделав fork проекта
-1. Вам нужно читать все комментарии подряд и выполнить все **TODO** в файле ``src/main.cpp``. Для разработки под Linux рекомендуется использовать CLion. Под Windows рекомендуется использовать Visual Studio 2017 Community (потребует создать Microsoft аккаунт). Так же под Windows можно использовать CLion+MSVC, но в данный момент в CLion нет поддержки отладчика.
+1. Вам нужно читать все комментарии подряд и выполнить все **TODO** в файле ``src/main.cpp``. Для разработки под Linux рекомендуется использовать CLion. Под Windows рекомендуется использовать Visual Studio Community (потребует создать Microsoft аккаунт). Так же под Windows можно использовать CLion+MSVC (не знаю насколько стабилен отладчик).
 2. Отправить **Pull-request** (указав имя и вывод программы при исполнении на вашем компьютере)
 3. Убедиться что Travis continuous integration смог скомпилировать ваш код и что все хорошо (если нет - то поправить)
 4. Ждать комментарии проверки
@@ -102,6 +99,6 @@ Aborted (Core dumped)
 Как работать под Windows
 ========================
 
-1. Используйте 64-битный компилятор, т.е. amd64, а не x86. (Если при запуске видите ``Invalid Parameter - 100``, то вы все еще используете 32-битный компилятор)
-2. Лучше всего использовать Visual Studio 2017 Community, она поддерживает CMake-проекты (``File`` -> ``Open`` -> ``Cmake...``). Разве что передавать аргументы запускаемой программе [неудобно](https://docs.microsoft.com/en-us/cpp/ide/cmake-tools-for-visual-cpp?view=vs-2017#configure-cmake-debugging-sessions).
-3. Можете использовать CLion, но я пробовал только с amd64 MSVC компилятором, и на данный момент в таком варианте нет отладчика.
+1. Используйте **64-битный компилятор**, т.е. amd64, а не x86. (Если при запуске видите ``Invalid Parameter - 100``, то вы все еще используете 32-битный компилятор)
+2. Лучше всего использовать Visual Studio 2017 Community или новее, она поддерживает CMake-проекты (``File`` -> ``Open`` -> ``Cmake...``). Разве что передавать аргументы запускаемой программе [неудобно](https://docs.microsoft.com/en-us/cpp/ide/cmake-tools-for-visual-cpp?view=vs-2017#configure-cmake-debugging-sessions).
+3. Можете использовать CLion, но отладчик с MSVC может быть не стабилен (не использовал, не знаю).
