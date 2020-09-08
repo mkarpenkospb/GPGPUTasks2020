@@ -78,6 +78,13 @@ Aborted (Core dumped)
 ```
 То попробуйте установить ```sudo apt install ocl-icd-libopencl1``` и попробовать выполнить ``./enumDevices`` снова.
 
+Если вы видите ошибку:
+```
+: CommandLine Error: Option 'polly' registered more than once!
+LLVM ERROR: inconsistency in registered CommandLine options
+```
+То наоборот может помочь удалить пакет ```sudo apt remove ocl-icd-libopencl1``` и попробовать выполнить ``./enumDevices`` снова.
+
 Если ``./enumDevices`` не показывает хотя бы одну платформу - создайте **Issue** с перечислением:
 
  - OS, процессор и видеокарта
