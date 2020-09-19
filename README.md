@@ -60,7 +60,7 @@
 ![CImg fail on Windows](/.figures/cimg_windows_fail.png)
 
 То:
-1. Скачайте файл ```GraphicsMagick-1.3.28-Q8-win64-dll.exe``` (отсюда - ftp://ftp.graphicsmagick.org/pub/GraphicsMagick/windows/)
+1. Скачайте файл ```GraphicsMagick-1.3.34-Q8-win64-dll.exe``` (отсюда - [ftp://ftp.graphicsmagick.org/pub/GraphicsMagick/windows/](ftp://ftp.graphicsmagick.org/pub/GraphicsMagick/windows/))
 2. Установите и не забудьте перезапустить среду разработки (чтобы при выполнении программы ```PATH``` был обновленный после установки GraphicsMagick)
 
 Задание 3.2. Суммирование чисел
