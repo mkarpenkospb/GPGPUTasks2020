@@ -1,6 +1,6 @@
 //#ifdef __CLION_IDE__
 //#include <math.h>
-#include "./clion_defines.cl"
+//#include "./clion_defines.cl"
 //#endif
 
 #line 6
