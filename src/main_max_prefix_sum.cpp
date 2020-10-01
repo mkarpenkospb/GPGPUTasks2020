@@ -45,19 +45,6 @@ int main(int argc, char **argv)
             as[i] = (unsigned int) r.next(-values_range, values_range);
             idx[i] = i + 1;
         }
-//        if (n == 512) {
-//            int sum = 0;
-//            int maxPref = 0;
-//            int result = 0;
-//            for (int  i = 128*1; i < 128 * 2; ++i) {
-//                sum += as[i];
-//                if (sum > maxPref) {
-//                    maxPref = sum;
-//                    result = i + 1;
-//                }
-//            }
-//            std::cout << "sum for test: maxPref = " <<  maxPref << ",  res = " << result << ", sum = " << sum << std::endl;
-//        }
         int reference_max_sum;
         int reference_result;
         {
