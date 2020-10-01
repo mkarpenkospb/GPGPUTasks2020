@@ -123,7 +123,6 @@ int main(int argc, char **argv)
         unsigned int workGroupSizeY = 16;
 
         ocl::Kernel kernel(mandelbrot_kernel, mandelbrot_kernel_length, "mandelbrot");
-        kernel.compile();
 
         // Если у вас есть интеловский драйвер для запуска на процессоре - попробуйте запустить на нем и взгляние на лог,
         // передав printLog=true - скорее всего в логе будет строчка вроде

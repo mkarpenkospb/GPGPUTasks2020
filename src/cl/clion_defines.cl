@@ -1,7 +1,7 @@
 #ifndef clion_defines_cl // pragma once
 #define clion_defines_cl
 
-#ifdef __CLION_IDE__
+//#ifdef __CLION_IDE__
 
 #define __kernel
 #define __global
@@ -65,7 +65,7 @@ size_t	get_global_offset	(uint dimindx);
 #define STATIC_KEYWORD static
 #endif
 
-#endif
+//#endif
 
 // 64 for AMD, 32 for NVidia, 8 for intel GPUs, 1 for CPU
 #define WARP_SIZE 64
