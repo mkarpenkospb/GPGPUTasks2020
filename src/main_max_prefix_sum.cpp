@@ -29,9 +29,7 @@ int main(int argc, char **argv)
     context.init(device.device_id_opencl);
     context.activate();
 
-    int workGroupSize = 32 * 4;
-
-
+    int workGroupSize = 32  * 4;
 
     for (int n = 2; n <= max_n; n *= 2) {
         std::cout << "______________________________________________" << std::endl;
@@ -117,7 +115,7 @@ int main(int argc, char **argv)
             gpu::gpu_mem_32f gpu_clean_idx_buffer; gpu_clean_idx_buffer.resize(n * sizeof(int));
             gpu_idx_buffer.copyTo(gpu_clean_idx_buffer, n * sizeof(int));
 
-            ocl::Kernel kernel(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "max_pref_simple");
+            ocl::Kernel kernel(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "max_pref_using_other_threads");
 
             timer t;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
@@ -157,8 +155,8 @@ int main(int argc, char **argv)
                 EXPECT_THE_SAME(reference_result, result, "GPU result should be consistent!");
                 t.nextLap();
             }
-            std::cout << "GPU simple implementation: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-            std::cout << "GPU simple implementation:: " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
+            std::cout << "GPU tree: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+            std::cout << "GPU tree: " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
         }
     }
 }
