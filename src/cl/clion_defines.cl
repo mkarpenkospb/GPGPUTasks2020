@@ -1,7 +1,7 @@
 #ifndef clion_defines_cl // pragma once
 #define clion_defines_cl
 
-#ifdef __CLION_IDE__
+//#ifdef __CLION_IDE__
 
 #define __kernel
 #define __global
