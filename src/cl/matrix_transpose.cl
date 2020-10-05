@@ -3,8 +3,10 @@
 
 #define TILE_SIZE 16
 
-__kernel void matrix_transpose(__global const float * as, __global float * as_t, unsigned int M, unsigned int K)
-{
+__kernel void matrix_transpose(
+        __global const float * as,
+        __global float * as_t,
+        unsigned int M, unsigned int K) {
 
     unsigned int group_id_i = get_group_id(1);
     unsigned int group_id_j = get_group_id(0);
