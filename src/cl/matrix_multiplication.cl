@@ -22,9 +22,9 @@ __kernel void matrix_multiplication(
     unsigned int global_i = get_global_id(1);
     unsigned int global_j = get_global_id(0);
 
-    __local float a_loc[TILE_SIZE][TILE_SIZE];
-    __local float b_loc[TILE_SIZE][TILE_SIZE];
-    __local float c_loc[TILE_SIZE][TILE_SIZE];
+    __local float a_loc[TILE_SIZE][TILE_SIZE + 1];
+    __local float b_loc[TILE_SIZE][TILE_SIZE + 1];
+    __local float c_loc[TILE_SIZE][TILE_SIZE + 1];
     c_loc[local_i][local_j] = 0;
 
     // Мы заранее знаем, что размерность совпадут
