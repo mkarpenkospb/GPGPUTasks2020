@@ -3,7 +3,6 @@
 [Остальные задания](https://github.com/GPGPUCourse/GPGPUTasks2020/).
 
 # Задание 5. Bitonic sort, radix sort
-=========
 
 [![Build Status](https://travis-ci.com/GPGPUCourse/GPGPUTasks2020.svg?branch=task05)](https://travis-ci.com/GPGPUCourse/GPGPUTasks2020)
 
