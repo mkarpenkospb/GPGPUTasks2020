@@ -1,7 +1,7 @@
 #ifndef clion_defines_cl // pragma once
 #define clion_defines_cl
 
-#ifdef __CLION_IDE__
+//#ifdef __CLION_IDE__
 
 #define __kernel
 #define __global
@@ -60,12 +60,14 @@ size_t	get_local_id		(uint dimindx);
 size_t	get_num_groups		(uint dimindx);
 size_t	get_group_id		(uint dimindx);
 size_t	get_global_offset	(uint dimindx);
+int atomic_add (__global int *p , int val);
+unsigned int atomic_add (__global unsigned int *p , unsigned int val);
 
 #ifndef STATIC_KEYWORD
 #define STATIC_KEYWORD static
 #endif
 
-#endif
+//#endif
 
 // 64 for AMD, 32 for NVidia, 8 for intel GPUs, 1 for CPU
 #define WARP_SIZE 64
