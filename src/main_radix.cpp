@@ -26,17 +26,8 @@ void prepare_local_prefixes(gpu::gpu_mem_32u& as_gpu,
 
     ocl::Kernel pref_sum(radix_kernel, radix_kernel_length, "pref_sum");
     pref_sum.compile();
-//    std::vector<unsigned int> s1(n, 0);
-//    std::vector<unsigned int> s2(n, 0);
-//    std::vector<unsigned int> s3(n / workGroupSize, 0);
-//    std::vector<unsigned int> s4(n / workGroupSize, 0);
     pref_sum.exec(gpu::WorkSize(workGroupSize, global_work_size),
                   as_gpu, ones_sum_gpu, zeroes_sum_gpu, ones_sum_roots_gpu, zeroes_sum_roots_gpu, shift);
-//    ones_sum_gpu.readN(s1.data(), n);
-//    zeroes_sum_gpu.readN(s2.data(), n);
-//    ones_sum_roots_gpu.readN(s3.data(), n / workGroupSize);
-//    zeroes_sum_roots_gpu.readN(s4.data(), n / workGroupSize);
-//    std::cout<<"here" << std::endl;
 }
 
 void count_prefixes(gpu::gpu_mem_32u& zeroes_gpu,
@@ -67,11 +58,6 @@ void count_prefixes(gpu::gpu_mem_32u& zeroes_gpu,
     double trees = start_roots_size * 1.0 / workGroupSize;
     unsigned int leaf_size = workGroupSize;
     unsigned int last_roots = start_roots_size % workGroupSize;
-//
-//    std::vector<unsigned int> s1(n, 0);
-//    std::vector<unsigned int> s2(n, 0);
-//    std::vector<unsigned int> s3(n / workGroupSize, 0);
-//    std::vector<unsigned int> s4(n / workGroupSize, 0);
 
     while (levels) {
         if (trees < 1) {
@@ -87,44 +73,11 @@ void count_prefixes(gpu::gpu_mem_32u& zeroes_gpu,
         update.exec(gpu::WorkSize(workGroupSize, global_work_size),
                     zeroes_gpu, ones_gpu, trees_zeroes, trees_ones, leaf_size);
 
-//        std::vector<unsigned int> tree_ones1(workGroupSize * 2 - 1, 0);
-//        std::vector<unsigned int> tree_zeroes1(workGroupSize * 2 - 1, 0);
-//        trees_ones.readN(tree_ones1.data(), tree_ones1.size());
-//        trees_zeroes.readN(tree_zeroes1.data(), tree_zeroes1.size());
-//        std::cout <<  "HOHOHO\n\n\n ";
-//        for(auto elem: tree_ones1) {
-//            std::cout << elem << " ";
-//        }
-//        std::cout << std::endl;
         last_roots = ((unsigned int) ceil(trees)) % workGroupSize;
         trees = trees / workGroupSize;
         leaf_size *= workGroupSize;
         levels--;
     }
-//
-//    zeroes_gpu.readN(s1.data(), n);
-//    ones_gpu.readN(s2.data(), n);
-//    for (int i = 0; i < n; ++i) {
-//        if (s1[i] + s2[i] != 256 * (i + 1)) {
-//            std::cout << "oops" << std::endl;
-//            for (int k = i - 10; k < i + 10; ++k) {
-//                std::cout << "{"<<s1[k]  << ", "<< s2[k] << "}, " << std::endl;
-//            }
-//
-//            std::vector<unsigned int> tree_ones1(workGroupSize * 2 - 1, 0);
-//            std::vector<unsigned int> tree_zeroes1(workGroupSize * 2 - 1, 0);
-//            trees_ones.readN(tree_ones1.data(), tree_ones1.size());
-//            trees_zeroes.readN(tree_zeroes1.data(), tree_zeroes1.size());
-//
-//            for(auto elem: tree_ones1) {
-//                std::cout << elem << " ";
-//            }
-//            std::cout << std::endl;
-//        }
-//    }
-//    zeroes_roots_gpu.readN(s3.data(), n / workGroupSize);
-//    ones_roots_gpu.readN(s4.data(), n / workGroupSize);
-//    std::cout<< s1[n / 4 - 1] << std::endl;
 }
 
 
@@ -147,7 +100,7 @@ int main(int argc, char **argv)
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 1;
+    int benchmarkingIters = 10;
     unsigned int n = 32 * 1024 * 1024;
     std::vector<unsigned int> as(n, 0);
     FastRandom r(n);
