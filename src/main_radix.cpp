@@ -11,6 +11,8 @@
 #include <iostream>
 #include <stdexcept>
 
+#define GROUP_SIZE 128
+
 void prepare_local_prefixes(gpu::gpu_mem_32u& as_gpu,
                             gpu::gpu_mem_32u& zeroes_sum_gpu,
                             gpu::gpu_mem_32u& ones_sum_gpu,
@@ -19,7 +21,7 @@ void prepare_local_prefixes(gpu::gpu_mem_32u& as_gpu,
                             unsigned int shift,
                             unsigned int n) {
 
-    unsigned int workGroupSize = 256;
+    unsigned int workGroupSize = GROUP_SIZE;
     unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
 
     ocl::Kernel pref_sum(radix_kernel, radix_kernel_length, "pref_sum");
@@ -46,7 +48,7 @@ void count_prefixes(gpu::gpu_mem_32u& zeroes_gpu,
                     unsigned int n
                     ) {
 
-    unsigned int workGroupSize = 256;
+    unsigned int workGroupSize = GROUP_SIZE;
     unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
 
     ocl::Kernel local_trees(radix_kernel, radix_kernel_length, "build_trees_local_step");
@@ -84,6 +86,16 @@ void count_prefixes(gpu::gpu_mem_32u& zeroes_gpu,
         }
         update.exec(gpu::WorkSize(workGroupSize, global_work_size),
                     zeroes_gpu, ones_gpu, trees_zeroes, trees_ones, leaf_size);
+
+//        std::vector<unsigned int> tree_ones1(workGroupSize * 2 - 1, 0);
+//        std::vector<unsigned int> tree_zeroes1(workGroupSize * 2 - 1, 0);
+//        trees_ones.readN(tree_ones1.data(), tree_ones1.size());
+//        trees_zeroes.readN(tree_zeroes1.data(), tree_zeroes1.size());
+//        std::cout <<  "HOHOHO\n\n\n ";
+//        for(auto elem: tree_ones1) {
+//            std::cout << elem << " ";
+//        }
+//        std::cout << std::endl;
         last_roots = ((unsigned int) ceil(trees)) % workGroupSize;
         trees = trees / workGroupSize;
         leaf_size *= workGroupSize;
@@ -136,7 +148,7 @@ int main(int argc, char **argv)
     context.activate();
 
     int benchmarkingIters = 1;
-    unsigned int n = 1024 * 1024;
+    unsigned int n = 32 * 1024 * 1024;
     std::vector<unsigned int> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -168,7 +180,7 @@ int main(int argc, char **argv)
     gpu::gpu_mem_32u trees_ones;
 
     {
-        unsigned int workGroupSize = 256;
+        unsigned int workGroupSize = GROUP_SIZE;
         unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
         unsigned int one_tree_size = 2 * workGroupSize - 1;
         unsigned int start_roots_size = n / workGroupSize / workGroupSize;
