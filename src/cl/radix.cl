@@ -164,49 +164,53 @@ __kernel void build_trees(__global unsigned int* in_zeroes,
                           unsigned int n) {
 
     unsigned int global_id = get_global_id(0);
-
-    unsigned int group_id = get_group_id(0);
     unsigned int local_id = get_local_id(0);
+    unsigned int group_id = get_group_id(0);
     unsigned int group_num = get_num_groups(0);
     unsigned int tree_size = (2 * GROUP_SIZE) - 1;
     unsigned int global_shift = tree_size * group_id;
     unsigned int levels = GROUP_SIZE;
-
     // нулевой уровень
 
-    trees_zeroes_global[global_shift + local_id] = in_zeroes[global_id];
-    trees_ones_global[global_shift + local_id] = in_ones[global_id];
+    __local unsigned int trees_zeroes[ (2 * GROUP_SIZE) - 1];
+    __local unsigned int trees_ones[ (2 * GROUP_SIZE) - 1];
 
-    if (n != -1 && local_id >= n) {
-        trees_zeroes_global[global_shift + local_id] = 0;
-        trees_ones_global[global_shift + local_id] = 0;
-    }
+    trees_zeroes[local_id] = in_zeroes[global_id] * (n != -1 | local_id < n);
+    trees_ones[local_id] = in_ones[global_id] * (n != -1 | local_id < n);
+
+    trees_zeroes_global[global_shift + local_id] = trees_zeroes[local_id];
+    trees_ones_global[global_shift + local_id] = trees_ones[local_id];
+
 
     unsigned int shift_write = GROUP_SIZE;
     unsigned int shift_read = 0;
-
-    barrier(CLK_GLOBAL_MEM_FENCE);
+    barrier(CLK_LOCAL_MEM_FENCE);
+    barrier(CLK_LOCAL_MEM_FENCE);
     while (levels >>= 1) {
 
         if (local_id < levels) {
-            trees_zeroes_global[global_shift + shift_write + local_id] =
-                    (trees_zeroes_global[global_shift + shift_read + 2 * local_id] +
-                     trees_zeroes_global[global_shift + shift_read + 2 * local_id + 1]);
+            trees_zeroes[shift_write + local_id] =
+                    (trees_zeroes[shift_read + 2 * local_id] +
+                     trees_zeroes[shift_read + 2 * local_id + 1]);
 
-            trees_ones_global[global_shift + shift_write + local_id] =
-                    (trees_ones_global[global_shift + shift_read + 2 * local_id] +
-                     trees_ones_global[global_shift + shift_read + 2 * local_id + 1]);
+            trees_ones[shift_write + local_id] =
+                    (trees_ones[shift_read + 2 * local_id] +
+                     trees_ones[shift_read + 2 * local_id + 1]);
+
+            trees_zeroes_global[global_shift + shift_write + local_id] = trees_zeroes[shift_write + local_id];
+            trees_ones_global[global_shift + shift_write + local_id] = trees_ones[shift_write + local_id];
         }
+
 
         shift_read = shift_write;
         shift_write += levels;
 
+        barrier(CLK_LOCAL_MEM_FENCE);
         barrier(CLK_GLOBAL_MEM_FENCE);
     }
-
     if (local_id == 0) {
-        in_zeroes[group_id] = trees_zeroes_global[global_shift + tree_size - 1];
-        in_ones[group_id] = trees_ones_global[global_shift + tree_size - 1];
+        in_zeroes[group_id] = trees_zeroes[tree_size - 1];
+        in_ones[group_id] = trees_ones[tree_size - 1];
     }
 }
 
