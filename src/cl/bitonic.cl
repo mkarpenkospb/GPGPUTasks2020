@@ -1,6 +1,6 @@
 //#include "./clion_defines.cl"
 
-#define GROUP_SIZE 128
+#define GROUP_SIZE 256
 
 //void swap(unsigned int* a, unsigned int* b) {
 //    unsigned int

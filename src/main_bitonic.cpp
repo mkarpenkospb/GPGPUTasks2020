@@ -73,7 +73,7 @@ int main(int argc, char **argv)
 
             t.restart(); // Запускаем секундомер после прогрузки данных чтобы замерять время работы кернела, а не трансфер данных
 
-            unsigned int workGroupSize = 128;
+            unsigned int workGroupSize = 256;
             //  workitem-ов будет в 2 раза меньше, чем элементов
             unsigned int global_work_size = ((n / 2) + workGroupSize - 1) / workGroupSize * workGroupSize;
 
