@@ -1,7 +1,7 @@
 //#include "./clion_defines.cl"
 
 
-#define GROUP_SIZE 128
+#define GROUP_SIZE 256
 
 __kernel void radix(__global unsigned int* as,
                     __global unsigned int* res,
@@ -24,11 +24,6 @@ __kernel void radix(__global unsigned int* as,
     unsigned int position_for_zero = (local_id == 0? 0 : pref_sum_zeroes[global_id - 1]) + zeroes_before;
     unsigned int position_for_one = (local_id == 0? 0 : pref_sum_ones[global_id - 1]) + ones_before + total_zeroes;
     unsigned int position = val ? position_for_one : position_for_zero;
-//    if (position == 16776759) {
-//        printf("global_id: %d\nval: %d\npref_sum_zeroes[global_id]: %d\npref_sum_ones[global_id]: %d\ntotal_zeroes: %d\nzeroes_before: %d\nones_before: %d\nposition_for_zero: %d\nposition_for_one: %d\nposition: %d\n",
-//               global_id, val, pref_sum_zeroes[global_id - 1], pref_sum_ones[global_id - 1], total_zeroes, zeroes_before, ones_before, position_for_zero, position_for_one, position);
-//        printf("\n------------------------------------------------------------\n");
-//    }
     res[position] = as[global_id];
 }
 
@@ -114,7 +109,6 @@ __kernel void count_pref_on_roots(
 
     while (levels) {
         if (levels == GROUP_SIZE) {
-            // (global_id + 1) так как нужен конец отрезка размером step_between_roots
             tree_zeroes[local_id] = (global_id < n) ? in_zeroes[(global_id + 1) * step_between_roots - 1] : 0;
             tree_ones[local_id] = (global_id < n) ? in_ones[(global_id + 1) * step_between_roots - 1] : 0;
         }
@@ -151,39 +145,27 @@ __kernel void update_from_pref(__global unsigned int* in_zeroes,
     unsigned int global_id = get_global_id(0);
     unsigned int group_id = get_group_id(0);
     unsigned int local_id = get_local_id(0);
-
+    unsigned int real_position = ((global_id + 1) * GROUP_SIZE - 1);
     // global_id / step_between_roots --  в каком отрезке размера step_between_roots мы находимся
 
     // global_id / step_between_roots  -- в какой группе отрезков (каждая группа по GROUP_SIZE элементов) мы находимся
-    unsigned int pref_group = ((global_id + 1) * GROUP_SIZE - 1)/ step_between_roots / GROUP_SIZE;
+    unsigned int pref_group = real_position / step_between_roots / GROUP_SIZE;
 
     // (global_id / step_between_roots) % GROUP_SIZE -- какое место в pref_group мы занимаем
-    unsigned int pos = ((((global_id + 1) * GROUP_SIZE - 1)/ step_between_roots) % GROUP_SIZE);
+    unsigned int pos = (real_position/ step_between_roots) % GROUP_SIZE;
 
     // нам не нужно трогать самых левых и сами корни.
     // пример, пусть step_between_roots = 128, тогда global_id == 127 трогать не надо, там корень.
     // если pos == 0, не трогаем!
-
-//    if (global_id == 128) {
-//        printf("broken id zeroes before: %d\n", in_zeroes[(global_id + 1) * GROUP_SIZE - 1]);
-//        printf("broken id to write %d\n", (global_id + 1) * GROUP_SIZE - 1);
-//        printf("broken id to read %d\n", pref_group * (step_between_roots * GROUP_SIZE) + pos * step_between_roots - 1);
-//        printf("broken id pref_group %d\n", pref_group);
-//        printf("broken id step_between_roots %d\n", step_between_roots);
-//        printf("broken id pos %d\n", pos);
-//    }
-
-    if (pos == 0 || ((global_id + 1) * GROUP_SIZE) % (step_between_roots) == 0) {
+    if (pos == 0 || (real_position + 1) % (step_between_roots) == 0) {
         return;
     }
     // нас интересуют последние элементы фрагментов, корни, в которых всё посчитано.
     // размер группы -- step_between_roots * GROUP_SIZE
     // нужно попасть на начало группы : pref_group * (step_between_roots * GROUP_SIZE)
-    // но на конец отрезка pos : (pos + 1) * step_between_roots - 1
+    // но на конец отрезка pos : pos * step_between_roots - 1
     // нужно взять значение из корня предыдущего отрезка.
-    in_zeroes[(global_id + 1) * GROUP_SIZE - 1] += in_zeroes[pref_group * (step_between_roots * GROUP_SIZE) + pos * step_between_roots - 1];
-    in_ones[(global_id + 1) * GROUP_SIZE - 1] += in_ones[pref_group * (step_between_roots * GROUP_SIZE) + pos * step_between_roots - 1];
-//    if (global_id == 128) {
-//        printf("broken id zeroes after: %d\n", in_zeroes[(global_id + 1) * GROUP_SIZE - 1]);
-//    }
+    in_zeroes[real_position] += in_zeroes[pref_group * (step_between_roots * GROUP_SIZE) + pos * step_between_roots - 1];
+    in_ones[real_position] += in_ones[pref_group * (step_between_roots * GROUP_SIZE) + pos * step_between_roots - 1];
+
 }

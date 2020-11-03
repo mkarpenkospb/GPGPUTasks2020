@@ -12,10 +12,9 @@
 #include <iostream>
 #include <stdexcept>
 
-#define GROUP_SIZE 128
+#define GROUP_SIZE 256
 
-void prepare_local_prefixes( const std::vector<unsigned int>& as,
-                             gpu::gpu_mem_32u& as_gpu,
+void prepare_local_prefixes(gpu::gpu_mem_32u& as_gpu,
                             gpu::gpu_mem_32u& zeroes_sum_gpu,
                             gpu::gpu_mem_32u& ones_sum_gpu,
                             unsigned int shift,
@@ -29,33 +28,6 @@ void prepare_local_prefixes( const std::vector<unsigned int>& as,
 
     pref_sum.exec(gpu::WorkSize(workGroupSize, global_work_size),
                   as_gpu, ones_sum_gpu, zeroes_sum_gpu, shift);
-
-//    std::vector<unsigned int> ones_cpu(n, 0);
-//    std::vector<unsigned int> zeroes_cpu(n, 0);
-//    for (size_t i = 0; i < n / workGroupSize; ++i) {
-//        ones_cpu[i * workGroupSize] = (as[i * workGroupSize] >> shift) & 1;
-//        zeroes_cpu[i * workGroupSize] = ((as[i * workGroupSize] ^ 0xFFFFFFFF) >> shift) & 1;
-//        for (size_t j = 1; j < workGroupSize; ++j) {
-//            size_t idx = i * workGroupSize + j;
-//            ones_cpu[idx] = ((as[idx] >> shift) & 1) + ones_cpu[idx - 1];
-//            zeroes_cpu[idx] = (((as[idx] ^ 0xFFFFFFFF) >> shift) & 1) + zeroes_cpu[idx - 1];
-//        }
-//    }
-//
-//    std::vector<unsigned int> ones_from_gpu(n, 0);
-//    std::vector<unsigned int> zeroes_from_gpu(n, 0);
-//    ones_sum_gpu.readN(ones_from_gpu.data(), n);
-//    zeroes_sum_gpu.readN(zeroes_from_gpu.data(), n);
-//
-//    for (size_t i = 0; i < n; ++i) {
-//        if (ones_from_gpu[i] != ones_cpu[i]) {
-//            std::cout << "ooooops: i = "<< i <<  "ones_from_gpu[i]: " << ones_from_gpu[i] << ", ones_cpu[i]: " << ones_cpu[i] << std::endl;
-//        }
-//        if (zeroes_from_gpu[i] != zeroes_cpu[i]) {
-//            std::cout << "ooooops: i = "<< i << " zeroes_from_gpu[i]: " << zeroes_from_gpu[i] << ", zeroes_cpu[i]: " << zeroes_cpu[i] << std::endl;
-//        }
-//    }
-//    std::cout << "fine!" << std::endl;
 }
 
 void count_prefixes(gpu::gpu_mem_32u& zeroes_gpu,
@@ -67,24 +39,11 @@ void count_prefixes(gpu::gpu_mem_32u& zeroes_gpu,
     // zeroes_roots_gpu, ones_roots_gpu -- пустые буфферы, в них на первом шаге текущей функции
     // положим корни массивов zeroes_gpu, ones_gpu
     // корни -- это вершины дерева отрезков, как если бы мы строили такие деревья для отрезков размера workGroupSize
-//    std::vector<unsigned int> zeroes_cpu(n);
-//    std::vector<unsigned int> ones_cpu(n);
-//    std::vector<unsigned int> zeroes_from_gpu(n);
-//    std::vector<unsigned int> ones_from_gpu(n);
-//    zeroes_gpu.readN(zeroes_cpu.data(), n);
-//    ones_gpu.readN(ones_cpu.data(), n);
 
     unsigned int workGroupSize = GROUP_SIZE;
     unsigned int global_work_size = 0;
     // (n / workGroupSize) -- тут надо префиксы обновлять
     unsigned int global_work_size_for_update = ((n / workGroupSize)  + workGroupSize - 1) / workGroupSize * workGroupSize;
-
-//    for (int i = 1; i < n / workGroupSize; ++i) {
-//        unsigned int curr = (i + 1) * workGroupSize - 1;
-//        unsigned int pref = i * workGroupSize - 1;
-//        zeroes_cpu[curr] += zeroes_cpu[pref];
-//        ones_cpu[curr] += ones_cpu[pref];
-//    }
 
     ocl::Kernel count_pref(radix_kernel, radix_kernel_length, "count_pref_on_roots");
     count_pref.compile();
@@ -99,77 +58,10 @@ void count_prefixes(gpu::gpu_mem_32u& zeroes_gpu,
         global_work_size = (roots + workGroupSize - 1) / workGroupSize * workGroupSize;
         count_pref.exec(gpu::WorkSize(workGroupSize, global_work_size), zeroes_gpu, ones_gpu, step_between_roots,
                         roots);
-//        zeroes_gpu.readN(zeroes_from_gpu.data(), n);
-//        ones_gpu.readN(ones_from_gpu.data(), n);
-//        auto stop =  (unsigned int) ceil(n  * 1.0 / (step_between_roots * workGroupSize));
-//        unsigned int stop2 =  std::min(workGroupSize, roots);
-//        for (int i = 0; i < stop; ++i) {
-//            for (int j = 1; j < stop2; ++j) {
-//                size_t curr = i * (step_between_roots * workGroupSize) + (j + 1) * step_between_roots - 1;
-//                size_t prev = i * (step_between_roots * workGroupSize) + j * step_between_roots - 1;
-//                zeroes_cpu[curr] += zeroes_cpu[prev];
-//                ones_cpu[curr] += ones_cpu[prev];
-//            }
-//        }
-
-//        for (size_t i = 0; i < n; ++i) {
-//            if (ones_from_gpu[i] != ones_cpu[i]) {
-//                std::cout << "ooooops: i = " << i << ", ones_from_gpu[i]: " << ones_from_gpu[i] << ", ones_cpu[i]: " << ones_cpu[i]
-//                          << std::endl;
-//            }
-//            if (zeroes_from_gpu[i] != zeroes_cpu[i]) {
-//                std::cout << "ooooops: i = " << i << ", zeroes_from_gpu[i]: " << zeroes_from_gpu[i] << ", zeroes_cpu[i]: "
-//                          << zeroes_cpu[i] << std::endl;
-//            }
-//        }
-
         update_pref.exec(gpu::WorkSize(workGroupSize, global_work_size_for_update), zeroes_gpu, ones_gpu, step_between_roots);
-//
-//        for (int i = 0; i < n / workGroupSize; ++i) {
-//            unsigned int pref_group =  ((i + 1) * workGroupSize - 1)/ step_between_roots / workGroupSize;
-//            unsigned int pos = ((((i + 1) * workGroupSize - 1)/ step_between_roots) % workGroupSize);
-//            if (pref_group == 0 && pos == 0 || ((i + 1) * workGroupSize) % step_between_roots == 0) {
-//                continue;
-//            }
-//            zeroes_cpu[(i + 1) * workGroupSize - 1] += zeroes_cpu[pref_group * step_between_roots * workGroupSize + (pos + 1) * step_between_roots - 1];
-//            ones_cpu[(i + 1) * workGroupSize - 1] += ones_cpu[pref_group * step_between_roots * workGroupSize + (pos + 1) * step_between_roots - 1];
-//        }
-
-////
-//        zeroes_gpu.readN(zeroes_from_gpu.data(), n);
-//        ones_gpu.readN(ones_from_gpu.data(), n);
-////
-//        for (size_t i = 0; i < n; ++i) {
-//            if (ones_from_gpu[i] != ones_cpu[i]) {
-//                std::cout << "ooooops: i = " << i << ", ones_from_gpu[i]: " << ones_from_gpu[i] << ", ones_cpu[i]: " << ones_cpu[i]
-//                          << std::endl;
-//            }
-//            if (zeroes_from_gpu[i] != zeroes_cpu[i]) {
-//                std::cout << "ooooops: i = " << i << ", zeroes_from_gpu[i]: " << zeroes_from_gpu[i] << ", zeroes_cpu[i]: "
-//                          << zeroes_cpu[i] << std::endl;
-//            }
-//        }
-
         step_between_roots *= workGroupSize;
         roots /= workGroupSize;
-//        std::cout << "fine!" << std::endl;
     }
-//    zeroes_gpu.readN(zeroes_from_gpu.data(), n);
-//    ones_gpu.readN(ones_from_gpu.data(), n);
-
-    // final check
-
-//    for (int i = 0; i < n; ++i ) {
-//        if (ones_from_gpu[i] != ones_cpu[i]) {
-//            std::cout << "ooooops: i = " << i << ", ones_from_gpu[i]: " << ones_from_gpu[i] << ", ones_cpu[i]: " << ones_cpu[i]
-//                      << std::endl;
-//        }
-//        if (zeroes_from_gpu[i] != zeroes_cpu[i]) {
-//            std::cout << "ooooops: i = " << i << ", zeroes_from_gpu[i]: " << zeroes_from_gpu[i] << ", zeroes_cpu[i]: "
-//                      << zeroes_cpu[i] << std::endl;
-//        }
-//    }
-
 }
 
 
@@ -192,7 +84,7 @@ int main(int argc, char **argv)
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 1;
+    int benchmarkingIters = 12;
     unsigned int n = 32 * 1024 * 1024;
     std::vector<unsigned int> as(n, 0);
     FastRandom r(n);
@@ -241,22 +133,11 @@ int main(int argc, char **argv)
             t.restart();
             // Запускаем секундомер после прогрузки данных чтобы замерять время работы кернела, а не трансфер данных
             for (int shift = 0; shift < levels; ++ shift) {
-                prepare_local_prefixes(as, as_gpu, zeroes_sum_gpu, ones_sum_gpu, shift, n);
+                prepare_local_prefixes(as_gpu, zeroes_sum_gpu, ones_sum_gpu, shift, n);
                 count_prefixes(zeroes_sum_gpu, ones_sum_gpu, n);
                 radix.exec(gpu::WorkSize(workGroupSize, global_work_size),
                            as_gpu, res_gpu, zeroes_sum_gpu, ones_sum_gpu, shift, n);
                 as_gpu.swap(res_gpu);
-//                as_gpu.readN(as.data(), n);
-//                for (unsigned int i = 0; i < n-1; ++i) {
-//                    if (((as[i] >> shift) & 1) > ((as[i + 1] >> shift) & 1)) {
-//                        std::cout << "oooooops, i = " << i << "\n";
-//                        for (unsigned int k = std::max( (unsigned int)0, i - 10); k < std::min(n , i + 10); k ++) {
-//                            std::cout << "(" << k << ", " << ((as[k] >> shift) & 1) << "), ";
-//                        }
-//                        std::cout << std::endl;
-//                    }
-//                }
-//                std::cout << "end shift\n" << std::endl;
             }
             t.nextLap();
         }
@@ -266,18 +147,6 @@ int main(int argc, char **argv)
         as_gpu.readN(as.data(), n);
     }
 
-    // Проверка без GPU
-
-//    for (unsigned int i = 0; i < n - 1; ++i) {
-//        if (as[i + 1] < as[i]) {
-//            std::cout << "oooooops, i = " << i << "\n";
-//            for (unsigned int k = std::max( (unsigned int)0, i - 10); k < std::min(n , i + 10); k ++) {
-//                std::cout << "(" << k << ", " << as[k] << "), ";
-//            }
-//            std::cout << std::endl;
-//        }
-//    }
-//    std::cout <<"fine fine fine" << std::endl;
     // Проверяем корректность результатов
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
