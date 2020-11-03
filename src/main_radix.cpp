@@ -4,6 +4,7 @@
 #include <libgpu/context.h>
 #include <libgpu/shared_device_buffer.h>
 
+
 // Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
 #include "cl/radix_cl.h"
 
@@ -13,11 +14,10 @@
 
 #define GROUP_SIZE 128
 
-void prepare_local_prefixes(gpu::gpu_mem_32u& as_gpu,
+void prepare_local_prefixes( const std::vector<unsigned int>& as,
+                             gpu::gpu_mem_32u& as_gpu,
                             gpu::gpu_mem_32u& zeroes_sum_gpu,
                             gpu::gpu_mem_32u& ones_sum_gpu,
-                            gpu::gpu_mem_32u& zeroes_sum_roots_gpu,
-                            gpu::gpu_mem_32u& ones_sum_roots_gpu,
                             unsigned int shift,
                             unsigned int n) {
 
@@ -26,63 +26,155 @@ void prepare_local_prefixes(gpu::gpu_mem_32u& as_gpu,
 
     ocl::Kernel pref_sum(radix_kernel, radix_kernel_length, "pref_sum");
     pref_sum.compile();
+
     pref_sum.exec(gpu::WorkSize(workGroupSize, global_work_size),
-                  as_gpu, ones_sum_gpu, zeroes_sum_gpu, ones_sum_roots_gpu, zeroes_sum_roots_gpu, shift);
+                  as_gpu, ones_sum_gpu, zeroes_sum_gpu, shift);
+
+//    std::vector<unsigned int> ones_cpu(n, 0);
+//    std::vector<unsigned int> zeroes_cpu(n, 0);
+//    for (size_t i = 0; i < n / workGroupSize; ++i) {
+//        ones_cpu[i * workGroupSize] = (as[i * workGroupSize] >> shift) & 1;
+//        zeroes_cpu[i * workGroupSize] = ((as[i * workGroupSize] ^ 0xFFFFFFFF) >> shift) & 1;
+//        for (size_t j = 1; j < workGroupSize; ++j) {
+//            size_t idx = i * workGroupSize + j;
+//            ones_cpu[idx] = ((as[idx] >> shift) & 1) + ones_cpu[idx - 1];
+//            zeroes_cpu[idx] = (((as[idx] ^ 0xFFFFFFFF) >> shift) & 1) + zeroes_cpu[idx - 1];
+//        }
+//    }
+//
+//    std::vector<unsigned int> ones_from_gpu(n, 0);
+//    std::vector<unsigned int> zeroes_from_gpu(n, 0);
+//    ones_sum_gpu.readN(ones_from_gpu.data(), n);
+//    zeroes_sum_gpu.readN(zeroes_from_gpu.data(), n);
+//
+//    for (size_t i = 0; i < n; ++i) {
+//        if (ones_from_gpu[i] != ones_cpu[i]) {
+//            std::cout << "ooooops: i = "<< i <<  "ones_from_gpu[i]: " << ones_from_gpu[i] << ", ones_cpu[i]: " << ones_cpu[i] << std::endl;
+//        }
+//        if (zeroes_from_gpu[i] != zeroes_cpu[i]) {
+//            std::cout << "ooooops: i = "<< i << " zeroes_from_gpu[i]: " << zeroes_from_gpu[i] << ", zeroes_cpu[i]: " << zeroes_cpu[i] << std::endl;
+//        }
+//    }
+//    std::cout << "fine!" << std::endl;
 }
 
 void count_prefixes(gpu::gpu_mem_32u& zeroes_gpu,
                     gpu::gpu_mem_32u& ones_gpu,
-                    gpu::gpu_mem_32u& zeroes_roots_gpu,
-                    gpu::gpu_mem_32u& ones_roots_gpu,
-                    gpu::gpu_mem_32u& trees_zeroes,
-                    gpu::gpu_mem_32u& trees_ones,
                     unsigned int n
                     ) {
+    // zeroes_gpu, ones_gpu -- массивы, для которых нужно будет посчитать преф сумму.
+    // в них уже есть значения, полученные из предыдущего шага
+    // zeroes_roots_gpu, ones_roots_gpu -- пустые буфферы, в них на первом шаге текущей функции
+    // положим корни массивов zeroes_gpu, ones_gpu
+    // корни -- это вершины дерева отрезков, как если бы мы строили такие деревья для отрезков размера workGroupSize
+//    std::vector<unsigned int> zeroes_cpu(n);
+//    std::vector<unsigned int> ones_cpu(n);
+//    std::vector<unsigned int> zeroes_from_gpu(n);
+//    std::vector<unsigned int> ones_from_gpu(n);
+//    zeroes_gpu.readN(zeroes_cpu.data(), n);
+//    ones_gpu.readN(ones_cpu.data(), n);
 
     unsigned int workGroupSize = GROUP_SIZE;
-    unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
+    unsigned int global_work_size = 0;
+    // (n / workGroupSize) -- тут надо префиксы обновлять
+    unsigned int global_work_size_for_update = ((n / workGroupSize)  + workGroupSize - 1) / workGroupSize * workGroupSize;
 
-    ocl::Kernel local_trees(radix_kernel, radix_kernel_length, "build_trees_local_step");
-    local_trees.compile();
+//    for (int i = 1; i < n / workGroupSize; ++i) {
+//        unsigned int curr = (i + 1) * workGroupSize - 1;
+//        unsigned int pref = i * workGroupSize - 1;
+//        zeroes_cpu[curr] += zeroes_cpu[pref];
+//        ones_cpu[curr] += ones_cpu[pref];
+//    }
 
-    ocl::Kernel build_trees(radix_kernel, radix_kernel_length, "build_trees");
-    build_trees.compile();
+    ocl::Kernel count_pref(radix_kernel, radix_kernel_length, "count_pref_on_roots");
+    count_pref.compile();
 
-    ocl::Kernel update(radix_kernel, radix_kernel_length, "update_from_trees");
-    update.compile();
+    ocl::Kernel update_pref(radix_kernel, radix_kernel_length, "update_from_pref");
+    update_pref.compile();
 
-    local_trees.exec(gpu::WorkSize(workGroupSize, global_work_size),
-                     zeroes_gpu, ones_gpu, zeroes_roots_gpu, ones_roots_gpu);
-    unsigned int start_roots_size = n / workGroupSize;
-    unsigned int levels = ceil(log(start_roots_size * 1.0) / log(workGroupSize));
-    double trees = start_roots_size * 1.0 / workGroupSize;
-    unsigned int leaf_size = workGroupSize;
-    unsigned int last_roots = start_roots_size % workGroupSize;
+    unsigned int step_between_roots = workGroupSize; // начальные корни
+    unsigned int roots = n / step_between_roots;
+    // нужно знать, сколько останется элементов на последнем шаге
+    while (roots) {
+        global_work_size = (roots + workGroupSize - 1) / workGroupSize * workGroupSize;
+        count_pref.exec(gpu::WorkSize(workGroupSize, global_work_size), zeroes_gpu, ones_gpu, step_between_roots,
+                        roots);
+//        zeroes_gpu.readN(zeroes_from_gpu.data(), n);
+//        ones_gpu.readN(ones_from_gpu.data(), n);
+//        auto stop =  (unsigned int) ceil(n  * 1.0 / (step_between_roots * workGroupSize));
+//        unsigned int stop2 =  std::min(workGroupSize, roots);
+//        for (int i = 0; i < stop; ++i) {
+//            for (int j = 1; j < stop2; ++j) {
+//                size_t curr = i * (step_between_roots * workGroupSize) + (j + 1) * step_between_roots - 1;
+//                size_t prev = i * (step_between_roots * workGroupSize) + j * step_between_roots - 1;
+//                zeroes_cpu[curr] += zeroes_cpu[prev];
+//                ones_cpu[curr] += ones_cpu[prev];
+//            }
+//        }
 
-    while (levels) {
-        if (trees < 1) {
-            build_trees.exec(gpu::WorkSize(workGroupSize, workGroupSize),
-                             zeroes_roots_gpu, ones_roots_gpu, trees_zeroes, trees_ones, last_roots);
-            update.exec(gpu::WorkSize(workGroupSize, global_work_size),
-                        zeroes_gpu, ones_gpu, trees_zeroes, trees_ones, leaf_size);
-            break;
-        } else {
-            build_trees.exec(gpu::WorkSize(workGroupSize, ((unsigned int)ceil(trees)) * workGroupSize),
-                             zeroes_roots_gpu, ones_roots_gpu, trees_zeroes, trees_ones, -1);
-        }
-        update.exec(gpu::WorkSize(workGroupSize, global_work_size),
-                    zeroes_gpu, ones_gpu, trees_zeroes, trees_ones, leaf_size);
+//        for (size_t i = 0; i < n; ++i) {
+//            if (ones_from_gpu[i] != ones_cpu[i]) {
+//                std::cout << "ooooops: i = " << i << ", ones_from_gpu[i]: " << ones_from_gpu[i] << ", ones_cpu[i]: " << ones_cpu[i]
+//                          << std::endl;
+//            }
+//            if (zeroes_from_gpu[i] != zeroes_cpu[i]) {
+//                std::cout << "ooooops: i = " << i << ", zeroes_from_gpu[i]: " << zeroes_from_gpu[i] << ", zeroes_cpu[i]: "
+//                          << zeroes_cpu[i] << std::endl;
+//            }
+//        }
 
-        last_roots = ((unsigned int) ceil(trees)) % workGroupSize;
-        trees = trees / workGroupSize;
-        leaf_size *= workGroupSize;
-        levels--;
+        update_pref.exec(gpu::WorkSize(workGroupSize, global_work_size_for_update), zeroes_gpu, ones_gpu, step_between_roots);
+//
+//        for (int i = 0; i < n / workGroupSize; ++i) {
+//            unsigned int pref_group =  ((i + 1) * workGroupSize - 1)/ step_between_roots / workGroupSize;
+//            unsigned int pos = ((((i + 1) * workGroupSize - 1)/ step_between_roots) % workGroupSize);
+//            if (pref_group == 0 && pos == 0 || ((i + 1) * workGroupSize) % step_between_roots == 0) {
+//                continue;
+//            }
+//            zeroes_cpu[(i + 1) * workGroupSize - 1] += zeroes_cpu[pref_group * step_between_roots * workGroupSize + (pos + 1) * step_between_roots - 1];
+//            ones_cpu[(i + 1) * workGroupSize - 1] += ones_cpu[pref_group * step_between_roots * workGroupSize + (pos + 1) * step_between_roots - 1];
+//        }
+
+////
+//        zeroes_gpu.readN(zeroes_from_gpu.data(), n);
+//        ones_gpu.readN(ones_from_gpu.data(), n);
+////
+//        for (size_t i = 0; i < n; ++i) {
+//            if (ones_from_gpu[i] != ones_cpu[i]) {
+//                std::cout << "ooooops: i = " << i << ", ones_from_gpu[i]: " << ones_from_gpu[i] << ", ones_cpu[i]: " << ones_cpu[i]
+//                          << std::endl;
+//            }
+//            if (zeroes_from_gpu[i] != zeroes_cpu[i]) {
+//                std::cout << "ooooops: i = " << i << ", zeroes_from_gpu[i]: " << zeroes_from_gpu[i] << ", zeroes_cpu[i]: "
+//                          << zeroes_cpu[i] << std::endl;
+//            }
+//        }
+
+        step_between_roots *= workGroupSize;
+        roots /= workGroupSize;
+//        std::cout << "fine!" << std::endl;
     }
+//    zeroes_gpu.readN(zeroes_from_gpu.data(), n);
+//    ones_gpu.readN(ones_from_gpu.data(), n);
+
+    // final check
+
+//    for (int i = 0; i < n; ++i ) {
+//        if (ones_from_gpu[i] != ones_cpu[i]) {
+//            std::cout << "ooooops: i = " << i << ", ones_from_gpu[i]: " << ones_from_gpu[i] << ", ones_cpu[i]: " << ones_cpu[i]
+//                      << std::endl;
+//        }
+//        if (zeroes_from_gpu[i] != zeroes_cpu[i]) {
+//            std::cout << "ooooops: i = " << i << ", zeroes_from_gpu[i]: " << zeroes_from_gpu[i] << ", zeroes_cpu[i]: "
+//                      << zeroes_cpu[i] << std::endl;
+//        }
+//    }
+
 }
 
 
 template<typename T>
-void raiseFail(const T &a, const T &b, std::string message, std::string filename, int line)
+void raiseFail(const T &a, const T &b, const std::string& message, const std::string& filename, int line)
 {
     if (a != b) {
         std::cerr << message << " But " << a << " != " << b << ", " << filename << ":" << line << std::endl;
@@ -100,7 +192,7 @@ int main(int argc, char **argv)
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 10;
+    int benchmarkingIters = 1;
     unsigned int n = 32 * 1024 * 1024;
     std::vector<unsigned int> as(n, 0);
     FastRandom r(n);
@@ -125,29 +217,18 @@ int main(int argc, char **argv)
     gpu::gpu_mem_32u res_gpu;
     gpu::gpu_mem_32u ones_sum_gpu;
     gpu::gpu_mem_32u zeroes_sum_gpu;
-    gpu::gpu_mem_32u zeroes_sum_roots_gpu;
-    gpu::gpu_mem_32u ones_sum_roots_gpu;
-    gpu::gpu_mem_32u ones_roots_gpu;
-    gpu::gpu_mem_32u zeroes_roots_gpu;
-    gpu::gpu_mem_32u trees_zeroes;
-    gpu::gpu_mem_32u trees_ones;
 
     {
         unsigned int workGroupSize = GROUP_SIZE;
         unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
-        unsigned int one_tree_size = 2 * workGroupSize - 1;
-        unsigned int start_roots_size = n / workGroupSize / workGroupSize;
-        unsigned int trees_max_size = ceil(start_roots_size * 1.0/ workGroupSize) * one_tree_size;
+
         as_gpu.resizeN(n);
         res_gpu.resizeN(n);
+
+        // массивы с преф суммами единическ и ноликов по группам в workGroupSize
+        // все корни можно хранить прямо в этом массиве и его обновлять
         ones_sum_gpu.resizeN(n);
         zeroes_sum_gpu.resizeN(n);
-        zeroes_sum_roots_gpu.resizeN(n / workGroupSize);
-        ones_sum_roots_gpu.resizeN(n / workGroupSize);
-        ones_roots_gpu.resizeN(n / workGroupSize / workGroupSize);
-        zeroes_roots_gpu.resizeN(n / workGroupSize / workGroupSize);
-        trees_zeroes.resizeN(trees_max_size);
-        trees_ones.resizeN(trees_max_size);
 
         ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix");
         radix.compile();
@@ -160,14 +241,22 @@ int main(int argc, char **argv)
             t.restart();
             // Запускаем секундомер после прогрузки данных чтобы замерять время работы кернела, а не трансфер данных
             for (int shift = 0; shift < levels; ++ shift) {
-                prepare_local_prefixes(as_gpu, zeroes_sum_gpu, ones_sum_gpu, zeroes_sum_roots_gpu, ones_sum_roots_gpu,
-                                       shift, n);
-                count_prefixes(zeroes_sum_roots_gpu, ones_sum_roots_gpu, zeroes_roots_gpu, ones_roots_gpu,
-                               trees_zeroes, trees_ones,
-                               n / workGroupSize);
+                prepare_local_prefixes(as, as_gpu, zeroes_sum_gpu, ones_sum_gpu, shift, n);
+                count_prefixes(zeroes_sum_gpu, ones_sum_gpu, n);
                 radix.exec(gpu::WorkSize(workGroupSize, global_work_size),
-                           as_gpu, res_gpu, zeroes_sum_gpu, ones_sum_gpu, zeroes_sum_roots_gpu, ones_sum_roots_gpu, shift, n);
+                           as_gpu, res_gpu, zeroes_sum_gpu, ones_sum_gpu, shift, n);
                 as_gpu.swap(res_gpu);
+//                as_gpu.readN(as.data(), n);
+//                for (unsigned int i = 0; i < n-1; ++i) {
+//                    if (((as[i] >> shift) & 1) > ((as[i + 1] >> shift) & 1)) {
+//                        std::cout << "oooooops, i = " << i << "\n";
+//                        for (unsigned int k = std::max( (unsigned int)0, i - 10); k < std::min(n , i + 10); k ++) {
+//                            std::cout << "(" << k << ", " << ((as[k] >> shift) & 1) << "), ";
+//                        }
+//                        std::cout << std::endl;
+//                    }
+//                }
+//                std::cout << "end shift\n" << std::endl;
             }
             t.nextLap();
         }
@@ -177,6 +266,18 @@ int main(int argc, char **argv)
         as_gpu.readN(as.data(), n);
     }
 
+    // Проверка без GPU
+
+//    for (unsigned int i = 0; i < n - 1; ++i) {
+//        if (as[i + 1] < as[i]) {
+//            std::cout << "oooooops, i = " << i << "\n";
+//            for (unsigned int k = std::max( (unsigned int)0, i - 10); k < std::min(n , i + 10); k ++) {
+//                std::cout << "(" << k << ", " << as[k] << "), ";
+//            }
+//            std::cout << std::endl;
+//        }
+//    }
+//    std::cout <<"fine fine fine" << std::endl;
     // Проверяем корректность результатов
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
