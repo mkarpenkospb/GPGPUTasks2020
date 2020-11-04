@@ -33,7 +33,6 @@ __kernel void radix(__global unsigned int* as,
     res[position] = as[global_id];
 }
 
-
 __kernel void pref_sum(__global const unsigned int* as,
                        __global unsigned int* ones_sum,
                        __global unsigned int* zeroes_sum,
@@ -71,18 +70,14 @@ __kernel void pref_sum(__global const unsigned int* as,
         }
 
         barrier(CLK_LOCAL_MEM_FENCE);
-
         tmp = write_shift;
         write_shift = read_shift;
         read_shift = tmp;
-//        if ((pos & 1) && read_shift + pos - 1 >= tree_size) {
-//            printf("SF on 52365275!\n");
-//        }
         if (pos & 1) {
             zeroes += tree_zeroes[read_shift + pos - 1];
             ones += tree_ones[read_shift + pos - 1];
         }
-
+        barrier(CLK_LOCAL_MEM_FENCE);
         pos >>= 1;
         levels >>= 1;
     }
@@ -142,6 +137,7 @@ __kernel void count_pref_on_roots(
             ones += tree_ones[read_shift + pos - 1];
         }
 
+        barrier(CLK_LOCAL_MEM_FENCE);
         pos >>= 1;
         levels >>= 1;
     }
@@ -165,7 +161,7 @@ __kernel void update_from_pref(__global unsigned int* in_zeroes,
     unsigned int pref_group = real_position / step_between_roots / GROUP_SIZE;
 
     // (global_id / step_between_roots) % GROUP_SIZE -- какое место в pref_group мы занимаем
-    unsigned int pos = (real_position/ step_between_roots) % GROUP_SIZE;
+    unsigned int pos = (real_position / step_between_roots) % GROUP_SIZE;
 
     // нам не нужно трогать самых левых и сами корни.
     // пример, пусть step_between_roots = 128, тогда global_id == 127 трогать не надо, там корень.
@@ -178,7 +174,6 @@ __kernel void update_from_pref(__global unsigned int* in_zeroes,
     // нужно попасть на начало группы : pref_group * (step_between_roots * GROUP_SIZE)
     // но на конец отрезка pos : pos * step_between_roots - 1
     // нужно взять значение из корня предыдущего отрезка.
-
     in_zeroes[real_position] += in_zeroes[pref_group * (step_between_roots * GROUP_SIZE) + pos * step_between_roots - 1];
     in_ones[real_position] += in_ones[pref_group * (step_between_roots * GROUP_SIZE) + pos * step_between_roots - 1];
 }
