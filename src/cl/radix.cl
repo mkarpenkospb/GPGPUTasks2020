@@ -19,10 +19,16 @@ __kernel void radix(__global unsigned int* as,
 
     unsigned int total_zeroes = pref_sum_zeroes[n - 1];
     short int val = (as[global_id] >> shift) & 1;
-    unsigned int zeroes_before = global_id >= GROUP_SIZE  ? pref_sum_zeroes[group_id * GROUP_SIZE - 1] : 0;
-    unsigned int ones_before = global_id >= GROUP_SIZE  ?  pref_sum_ones[group_id * GROUP_SIZE - 1] : 0;
-    unsigned int position_for_zero = (local_id == 0? 0 : pref_sum_zeroes[global_id - 1]) + zeroes_before;
-    unsigned int position_for_one = (local_id == 0? 0 : pref_sum_ones[global_id - 1]) + ones_before + total_zeroes;
+    unsigned int position_for_zero = 0;
+    unsigned int position_for_one = total_zeroes;
+    if (global_id >= GROUP_SIZE) {
+        position_for_zero += pref_sum_zeroes[group_id * GROUP_SIZE - 1];
+        position_for_one += pref_sum_ones[group_id * GROUP_SIZE - 1];
+    }
+    if (local_id != 0) {
+        position_for_zero += pref_sum_zeroes[global_id - 1];
+        position_for_one += pref_sum_ones[global_id - 1];
+    }
     unsigned int position = val ? position_for_one : position_for_zero;
     res[position] = as[global_id];
 }
@@ -51,7 +57,7 @@ __kernel void pref_sum(__global const unsigned int* as,
 
     unsigned int zeroes = 0;
     unsigned int ones = 0;
-
+    unsigned int tree_size = GROUP_SIZE + GROUP_SIZE / 2;
     while (levels) {
         if (levels == GROUP_SIZE) {
             tree_zeroes[local_id] = ((as[global_id] ^ 0xFFFFFFFF) >> shift) & 1;
@@ -69,7 +75,9 @@ __kernel void pref_sum(__global const unsigned int* as,
         tmp = write_shift;
         write_shift = read_shift;
         read_shift = tmp;
-
+//        if ((pos & 1) && read_shift + pos - 1 >= tree_size) {
+//            printf("SF on 52365275!\n");
+//        }
         if (pos & 1) {
             zeroes += tree_zeroes[read_shift + pos - 1];
             ones += tree_ones[read_shift + pos - 1];
@@ -93,7 +101,7 @@ __kernel void count_pref_on_roots(
     unsigned int global_id = get_global_id(0);
     unsigned int local_id = get_local_id(0);
     unsigned int group_id = get_group_id(0);
-
+    unsigned int tree_size = GROUP_SIZE + GROUP_SIZE / 2;
     __local unsigned int tree_zeroes[GROUP_SIZE + GROUP_SIZE / 2]; //
     __local unsigned int tree_ones[GROUP_SIZE + GROUP_SIZE / 2];
 
@@ -109,8 +117,13 @@ __kernel void count_pref_on_roots(
 
     while (levels) {
         if (levels == GROUP_SIZE) {
-            tree_zeroes[local_id] = (global_id < n) ? in_zeroes[(global_id + 1) * step_between_roots - 1] : 0;
-            tree_ones[local_id] = (global_id < n) ? in_ones[(global_id + 1) * step_between_roots - 1] : 0;
+            if (global_id < n) {
+                tree_zeroes[local_id] = in_zeroes[(global_id + 1) * step_between_roots - 1];
+                tree_ones[local_id] = in_ones[(global_id + 1) * step_between_roots - 1];
+            } else {
+                tree_zeroes[local_id] = 0;
+                tree_ones[local_id] =  0;
+            }
         }
         else if (local_id < levels) {
             tree_zeroes[write_shift + local_id] =
@@ -165,7 +178,7 @@ __kernel void update_from_pref(__global unsigned int* in_zeroes,
     // нужно попасть на начало группы : pref_group * (step_between_roots * GROUP_SIZE)
     // но на конец отрезка pos : pos * step_between_roots - 1
     // нужно взять значение из корня предыдущего отрезка.
+
     in_zeroes[real_position] += in_zeroes[pref_group * (step_between_roots * GROUP_SIZE) + pos * step_between_roots - 1];
     in_ones[real_position] += in_ones[pref_group * (step_between_roots * GROUP_SIZE) + pos * step_between_roots - 1];
-
 }
